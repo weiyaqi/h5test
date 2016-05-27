@@ -1,322 +1,184 @@
-<!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="utf-8"/>
-		<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
-		<meta name="misapplication-tap-highlight" content="no"/>
-		<meta name="HandheldFriendly" content="true"/>
-		<meta name="MobileOptimized" content="320"/>
-		<title>Hello H5+</title>
-		<script type="text/javascript" src="js/update.js"></script>
-		<script type="text/javascript" charset="utf-8">
-//取消浏览器的所有事件，使得active的样式在手机上正常生效
-document.addEventListener('touchstart',function(){
-    return false;
-},true);
-// 禁止选择
-document.oncontextmenu=function(){
+﻿(function(w){
+// 空函数
+function shield(){
 	return false;
-};
+}
+document.addEventListener('touchstart',shield,false);//取消浏览器的所有事件，使得active的样式在手机上正常生效
+document.oncontextmenu=shield;//屏蔽选择函数
 // H5 plus事件处理
-var as='pop-in';// 默认窗口动画
+var ws=null,as='pop-in';
 function plusReady(){
-	// 隐藏滚动条
-	plus.webview.currentWebview().setStyle({scrollIndicator:'none'});
+	ws=plus.webview.currentWebview();
 	// Android处理返回键
 	plus.key.addEventListener('backbutton',function(){
-		if(confirm('确认退出？')){
-			plus.runtime.quit();
-		}
+		back();
 	},false);
 	compatibleAdjust();
 }
-if(window.plus){
+if(w.plus){
 	plusReady();
 }else{
 	document.addEventListener('plusready',plusReady,false);
 }
 // DOMContentLoaded事件处理
-var _domReady=false;
+var domready=false;
 document.addEventListener('DOMContentLoaded',function(){
-	_domReady=true;
+	domready=true;
+	gInit();
+	document.body.onselectstart=shield;
 	compatibleAdjust();
 },false);
-// 兼容性样式调整
-var _adjust=false;
-function compatibleAdjust(){
-	if(_adjust||!window.plus||!_domReady){
-		return;
-	}
-	_adjust=true;
-	// iOS平台特效
-	if('iOS'==plus.os.name){
-		document.getElementById('content').className='scontent';	// 使用div的滚动条
-		if(navigator.userAgent.indexOf('StreamApp')>=0){	// 在流应用模式下显示返回按钮
-			document.getElementById('back').style.visibility='visible';
+// 处理返回事件
+w.back=function(hide){
+	if(w.plus){
+		ws||(ws=plus.webview.currentWebview());
+		if(hide||ws.preate){
+			ws.hide('auto');
+		}else{
+			ws.close('auto');
 		}
-	}
-	// 预创建二级窗口
-//	preateWebviews();
-	// 关闭启动界面
-	setTimeout(function(){
-		plus.navigator.closeSplashscreen();
-		plus.navigator.setStatusBarBackground('#FFFFFF');
-		if(plus.navigator.isImmersedStatusbar()){
-			plus.navigator.setStatusBarStyle('UIStatusBarStyleBlackOpaque');
-		}
-	},500);
-}
-// 处理点击事件
-var _openw=null;
-function clicked(id,a,s){
-	if(_openw){return;}
-	a||(a=as);
-	_openw=preate[id];
-	if(_openw){
-		_openw.showded=true;
-		_openw.show(a,null,function(){
-			_openw=null;//避免快速点击打开多个页面
-		});
+	}else if(history.length>1){
+		history.back();
 	}else{
-//		var wa=plus.nativeUI.showWaiting();
-		_openw=plus.webview.create(id,id,{scrollIndicator:'none',scalable:false,popGesture:'hide'},{preate:true});
-		preate[id]=_openw;
-		_openw.addEventListener('loaded',function(){//叶面加载完成后才显示
+		w.close();
+	}
+};
+// 处理点击事件
+var openw=null,waiting=null;
+/**
+ * 打开新窗口
+ * @param {URIString} id : 要打开页面url
+ * @param {boolean} wa : 是否显示等待框
+ * @param {boolean} ns : 是否不自动显示
+ * @param {JSON} ws : Webview窗口属性
+ */
+w.clicked=function(id,wa,ns,ws){
+	if(openw){//避免多次打开同一个页面
+		return null;
+	}
+	if(w.plus){
+		wa&&(waiting=plus.nativeUI.showWaiting());
+		ws=ws||{};
+		ws.scrollIndicator||(ws.scrollIndicator='none');
+		ws.scalable||(ws.scalable=false);
+		var pre='';//'http://192.168.1.178:8080/h5/';
+		openw=plus.webview.create(pre+id,id,ws);
+		ns||openw.addEventListener('loaded',function(){//页面加载完成后才显示
 //		setTimeout(function(){//延后显示可避免低端机上动画时白屏
-//			wa.close();
-			_openw.showded=true;
-			s||_openw.show(a,null,function(){
-				_openw=null;//避免快速点击打开多个页面
-			});
-			s&&(_openw=null);//避免s模式下变量无法重置
-//		},10);
+			openw.show(as);
+			closeWaiting();
+//		},200);
 		},false);
-		_openw.addEventListener('hide',function(){
-			_openw&&(_openw.showded=true);
-			_openw=null;
+		openw.addEventListener('close',function(){//页面关闭后可再次打开
+			openw=null;
 		},false);
-		_openw.addEventListener('close',function(){//页面关闭后可再次打开
-			_openw=null;
-			preate[id]&&(preate[id]=null);//兼容窗口的关闭
+		return openw;
+	}else{
+		w.open(id);
+	}
+	return null;
+};
+w.openDoc=function(t,c){
+	var d=plus.webview.getWebviewById('document');
+	if(d){
+		d.evalJS('updateDoc("'+t+'","'+c+'")');
+	}else{
+		d=plus.webview.create('/plus/doc.html','document',{zindex:9999,popGesture:'hide'},{preate:true});
+		d.addEventListener('loaded',function(){
+			d.evalJS('updateDoc("'+t+'","'+c+'")');
 		},false);
 	}
 }
-// 预创建二级页面
-var preate={};
-function preateWebviews(){
-	preateWebivew('plus/webview.html');
-	var plist=document.getElementById('plist').children;
-	// 由于启动是预创建过多Webview窗口会消耗较长的时间，所以这里限制仅创建5个
-	for( var i=0;i<plist.length&&i<2;i++){
-		var id=plist[i].id;
-		id&&(id.length>0)&&preateWebivew(id);
-	}
+/**
+ * 关闭等待框
+ */
+w.closeWaiting=function(){
+	waiting&&waiting.close();
+	waiting=null;
 }
-function preateWebivew(id){
-	if(!preate[id]){
-		var w=plus.webview.create(id,id,{scrollIndicator:'none',scalable:false,popGesture:'hide'},{preate:true});
-		preate[id]=w;
-		w.addEventListener('close',function(){//页面关闭后可再次打开
-			_openw=null;
-			preate[id]&&(preate[id]=null);//兼容窗口的关闭
+// 兼容性样式调整
+var adjust=false;
+function compatibleAdjust(){
+	if(adjust||!w.plus||!domready){
+		return;
+	}	// iOS平台使用滚动的div
+	if('iOS'==plus.os.name){
+		var t=document.getElementById("dcontent");
+		t&&(t.className="sdcontent");
+		t=document.getElementById("content");
+		t&&(t.className="scontent");
+		//iOS8横竖屏切换div不更新滚动问题
+		var lasto=window.orientation;
+		window.addEventListener("orientationchange",function(){
+			var nowo=window.orientation;
+			if(lasto!=nowo&&(90==nowo||-90==nowo)){
+				dcontent&&(0==dcontent.scrollTop)&&(dcontent.scrollTop=1);
+				content&&(0==content.scrollTop)&&(content.scrollTop=1);
+			}
+			lasto=nowo;
 		},false);
 	}
-}
-// 清除预创建页面(仅)
-function preateClear(){
-	for(var p in preate){
-		var w=preate[p];
-		if(w&&w.showded&&!w.isVisible()){
-			w.close();
-			preate[p]=null;
+	adjust=true;
+};
+w.compatibleConfirm=function(){
+	plus.nativeUI.confirm('本OS原生层面不提供该控件，需使用mui框架实现类似效果。请点击“确定”下载Hello mui示例',function(e){
+		if(0==e.index){
+			plus.runtime.openURL("http://www.dcloud.io/hellomui/");
 		}
+	},"",["确定","取消"]);
+}
+// 通用元素对象
+var _dout_=null,_dcontent_=null;
+w.gInit=function(){
+	_dout_=document.getElementById("output");
+	_dcontent_=document.getElementById("dcontent");
+};
+// 清空输出内容
+w.outClean=function(){
+	_dout_.innerText="";
+	_dout_.scrollTop=0;//在iOS8存在不滚动的现象
+};
+// 输出内容
+w.outSet=function(s){
+	_dout_.innerText=s+"\n";
+	(0==_dout_.scrollTop)&&(_dout_.scrollTop=1);//在iOS8存在不滚动的现象
+};
+// 输出行内容
+w.outLine=function(s){
+	_dout_.innerText+=s+"\n";
+	(0==_dout_.scrollTop)&&(_dout_.scrollTop=1);//在iOS8存在不滚动的现象
+};
+// 格式化时长字符串，格式为"HH:MM:SS"
+w.timeToStr=function(ts){
+	if(isNaN(ts)){
+		return "--:--:--";
 	}
-}
-		</script>
-		<link rel="stylesheet" href="css/common.css" type="text/css" charset="utf-8"/>
-		<style type="text/css">
-li {
-	padding:0.8em;
-	border-bottom:1px solid #eaeaea;
-}
-li:active {
-	background:#f4f4f4;
-}
-.iabout {
-	background:no-repeat center center url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABYCAYAAAADWlKCAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAK6wAACusBgosNWgAAABZ0RVh0Q3JlYXRpb24gVGltZQAwOS8xMi8xM5w+I3MAAAAcdEVYdFNvZnR3YXJlAEFkb2JlIEZpcmV3b3JrcyBDUzVxteM2AAADkUlEQVR4nO2b63HTQBRGTxj+EyrAVBAzWwBKBYQO0kHcAU4HTgehApwKUArYwa4ApwJwBeGHNuAY2URaSfczuWcmk3jH+xid7N596ej+/h5HhxfWDXAe40LEcCFiuBAxXIgYLkQMFyKGCxHDhYjhQsRwIWK4EDFciBguRAwXIoYLEcOFiOFCxHAhYrgQMVyIGC5EDBcihgsRw4WI4ULEeGndgKbEGEdAkX7GwMmOry6BBVAC8xDCz/5bl8/RodztjTEWwAT40LKIG2AWQii7alMfyAuJMY6BGfC+oyJvgamqGGkhMcYZcNFT8VchhElPZbdGUkiM8Zhq7N8VH7piCRRK8UVulpWGqJL+ZZDqWKQ6JZDqIalnLIA3GcUs0+8mQmV6iloPKWkv4zPwOoQwDiGMgVNg/cS8J6luc2R6SGYAvw0hFDVlzmk2TTYP9BI9JK0xcmZTsx3pq4blXFjHEwkhwLSncs9a5NkldxDMh6zUO75mFvMoKKfJwTXtV/WnVgtHhb2sLsbsE2AVY1ykz7mr+glGQd60h6T/5B9mDdjP2xDCauhKrWNImzF+KAqLSq2FFMb176OwqNRaSFdTzDvgkmqYOaJaFOZiMv21Duq5+1VrYBJCuN5MDCGUMcbMogfZS/sL6x6SwyUw2pYBvycLB8khCllTrROmwPGOh18M2qIOOUQh58AorTm+Uz/WF0M2qEusY0gbvmx+2LGiLgZpSQ8cYg/Z5HY7IQ1hJgG5C6yFLP/9lb0satKKzDIfyG1bK6yF1D3QJpQ1aV2t/nPb1gprIWUP+YvMMveV3TuHLGS5fQaebjXmnMdvMu+onEaYCkm7qTcts5c1aaONv6+oztnbcGN14cG6h0D7E7qyJm1F2tOiOoVsux9ldmpofmIIEGMsaX6otPO8Ip2Lz2k3fNVemBgKlYXhBPjWJEOdjLQGmQCfMtoyzcibjUQPgVbXgD6GEOYp7zHVlsqEvKBufg1IRghA2p966ip7zZ+1Qhc345fpgp0pCkF9k4Knr5BfUYnoQsYdIvtfUkLSVPOc6gENxRI4U7jXC2JD1gPP+XUESSEPPMcXdqSGrG3SAzulZps9g1vgnaIMEO8hm/hLn6Kk+HJGs9eiS4tbiG04OCH/O9Ix5DniQsRwIWK4EDFciBguRAwXIoYLEcOFiOFCxHAhYrgQMVyIGC5EDBcihgsRw4WI4ULEcCFiuBAxfgHyQw1G9FJgWwAAAABJRU5ErkJggg==);
-	background-size:50px 44px;
-}
-.item {
-	display:block;
-	background:no-repeat right center url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAsCAYAAAB/nHhDAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAKwwAACsMBNCkkqwAAABZ0RVh0Q3JlYXRpb24gVGltZQAwNC8yOC8xMqLz6JEAAAAcdEVYdFNvZnR3YXJlAEFkb2JlIEZpcmV3b3JrcyBDUzVxteM2AAABJ0lEQVRYhe3Wv6rCMBQG8C/VN1AEd3HSzuYO3jr4knkY0UE62xTBcp9A8A0uHhc72CZp/lQQyZmT7xfSJKeMiPDOSt6aHoEIRKAbkLKioqiCrroWkLKi+51ARAhBlEAdXlcI0gLK8u8lPBRpAYvFjCUJUw72QZRbtFzOe0O0H7kvxHhM83yfhiJdF+2c5/utCTmdLnS93rQQs2mZQogN59lOdbrqmk7HmExGrZVYAU9kzXl2cEWsgSfys1r9Hk1TmogTAABFcTFOaQJOr6mUlVO4E9B8n2zCrQHfcAAYmoKFEAPOs39dOGMMaTpXX5J6jGlTTSu3CQcsGk5IuBboK1wJ6BqOT7gS0DUcn3AlALR7gW84YHGKiOAd3gn0UV/+6xiBCHwG8AByzMrOPKV7sAAAAABJRU5ErkJggg==);
-	background-size:12px 22px;
-	-ms-touch-action:auto;
-}
-.chs {
-	font-size:0.8em;
-	color:#838383;
-}
-		</style>
-	</head>
-	<body onselectstart="return false;">
-		<header id="header">
-			<div id="back" style="visibility:hidden" class="nvbt iback" onclick="plus.runtime.quit()"></div>
-			<div class="nvtt">Hello HTML5+</div>
-			<div class="nvbt iabout" onclick="clicked('about.html','zoom-fade-out',true)"></div>
-		</header>
-		<div id="content" class="content">
-		<ul id="plist" style="list-style:none;margin:0;padding:0;text-align:left;">
-			<li id="plus/accelerometer.html" onclick="clicked(this.id);">
-				<span class="item">Accelerometer
-					<div class="chs">加速度传感器</div>
-				</span>
-			</li>
-			<li id="plus/audio.html" onclick="clicked(this.id);">
-				<span class="item">Audio
-					<div class="chs">音频录制/播放</div>
-				</span>
-			</li>
-			<li id="plus/barcode.html" onclick="clicked(this.id);">
-				<span class="item">Barcode
-					<div class="chs">二维码扫描</div>
-				</span>
-			</li>
-			<li id="plus/camera.html" onclick="clicked(this.id);">
-				<span class="item">Camera
-					<div class="chs">摄像头拍照/录像</div>
-				</span>
-			</li>
-			<li id="plus/device.html" onclick="clicked(this.id);">
-				<span class="item">Device
-					<div class="chs">设备信息</div>
-				</span>
-			</li>
-			<li id="plus/downloader.html" onclick="clicked(this.id);">
-				<span class="item">Downloader
-					<div class="chs">下载管理</div>
-				</span>
-			</li>
-			<li id="plus/events.html" onclick="clicked(this.id);">
-				<span class="item">Events
-					<div class="chs">系统事件</div>
-				</span>
-			</li>
-			<li id="plus/file.html" onclick="clicked(this.id);">
-				<span class="item">File System
-					<div class="chs">文件系统</div>
-				</span>
-			</li>
-			<li id="plus/gallery.html" onclick="clicked(this.id);">
-				<span class="item">Gallery
-					<div class="chs">系统相册</div>
-				</span>
-			</li>
-			<li id="plus/geolocation.html" onclick="clicked(this.id);">
-				<span class="item">Geolocation
-					<div class="chs">地理定位</div>
-				</span>
-			</li>
-			<li id="plus/maps.html" onclick="clicked(this.id);">
-				<span class="item">Maps
-					<div class="chs">地图</div>
-				</span>
-			</li>
-			<li id="plus/message.html" onclick="clicked(this.id);">
-				<span class="item">Messaging
-					<div class="chs">消息通讯</div>
-				</span>
-			</li>
-			<li id="plus/nativeui.html" onclick="clicked(this.id);">
-				<span class="item">NativeUI
-					<div class="chs">原生界面</div>
-				</span>
-			</li>
-			<li id="plus/navigator.html" onclick="clicked(this.id);">
-				<span class="item">Navigator
-					<div class="chs">浏览器环境</div>
-				</span>
-			</li>
-			<li id="plus/oauth.html" onclick="clicked(this.id);">
-				<span class="item">OAuth
-					<div class="chs">授权登录认证</div>
-				</span>
-			</li>
-			<li id="plus/orientation.html" onclick="clicked(this.id);">
-				<span class="item">Orientation
-					<div class="chs">方向传感器</div>
-				</span>
-			</li>
-			<li id="plus/payment.html" onclick="clicked(this.id);">
-				<span class="item">Payment
-					<div class="chs">支付</div>
-				</span>
-			</li>
-			<li id="plus/proximity.html" onclick="clicked(this.id);">
-				<span class="item">Proximity
-					<div class="chs">距离传感器</div>
-				</span>
-			</li>
-			<li id="plus/push.html" onclick="clicked(this.id);">
-				<span class="item">Push
-					<div class="chs">消息推送</div>
-				</span>
-			</li>
-			<li id="plus/runtime.html" onclick="clicked(this.id);">
-				<span class="item">Runtime
-					<div class="chs">运行环境</div>
-				</span>
-			</li>
-			<li id="plus/share.html" onclick="clicked(this.id);">
-				<span class="item">Share
-					<div class="chs">分享</div>
-				</span>
-			</li>
-			<li id="plus/speech.html" onclick="clicked(this.id);">
-				<span class="item">Speech
-					<div class="chs">语音识别</div>
-				</span>
-			</li>
-			<li id="plus/statistic.html" onclick="clicked(this.id);">
-				<span class="item">Statistic
-					<div class="chs">统计管理</div>
-				</span>
-			</li>
-			<li id="plus/storage.html" onclick="clicked(this.id);">
-				<span class="item">Storage
-					<div class="chs">本地数据存储</div>
-				</span>
-			</li>
-			<li id="plus/uploader.html" onclick="clicked(this.id);">
-				<span class="item">Uploader
-					<div class="chs">上传管理</div>
-				</span>
-			</li>
-			<li id="plus/webview.html" onclick="clicked(this.id);">
-				<span class="item">Webview
-					<div class="chs">窗口管理</div>
-				</span>
-			</li>
-			<li id="plus/xhr.html" onclick="clicked(this.id);">
-				<span class="item">XMLHttpRequest
-					<div class="chs">跨域请求</div>
-				</span>
-			</li>
-			<li id="plus/zip.html" onclick="clicked(this.id);">
-				<span class="item">ZIP
-					<div class="chs">文件压缩/解压</div>
-				</span>
-			</li>
-			<li id="plus/njs.html" onclick="clicked(this.id)">
-				<span class="item">Native.JS
-					<div class="chs">JS调用原生代码</div>
-				</span>
-			</li>
-		</ul>
-		</div>
-	</body>
-	<script type="text/javascript" src="js/immersed.js" ></script>
-	<script type="text/javascript" src="js/shortcut.js" ></script>
-	<script type="text/javascript">
+	var h=parseInt(ts/3600);
+	var m=parseInt((ts%3600)/60);
+	var s=parseInt(ts%60);
+	return (ultZeroize(h)+":"+ultZeroize(m)+":"+ultZeroize(s));
+};
+// 格式化日期时间字符串，格式为"YYYY-MM-DD HH:MM:SS"
+w.dateToStr=function(d){
+	return (d.getFullYear()+"-"+ultZeroize(d.getMonth()+1)+"-"+ultZeroize(d.getDate())+" "+ultZeroize(d.getHours())+":"+ultZeroize(d.getMinutes())+":"+ultZeroize(d.getSeconds()));
+};
+/**
+ * zeroize value with length(default is 2).
+ * @param {Object} v
+ * @param {Number} l
+ * @return {String} 
+ */
+w.ultZeroize=function(v,l){
+	var z="";
+	l=l||2;
+	v=String(v);
+	for(var i=0;i<l-v.length;i++){
+		z+="0";
+	}
+	return z+v;
+};
+})(window);
+
 ;(function () {
 	'use strict';
 
@@ -1163,5 +1025,3 @@ document.addEventListener('DOMContentLoaded', function() {
 }, false);
 
 }());
-	</script>
-</html>
